@@ -2,7 +2,7 @@
 
 An interactive web application that pits AI against AI in debates about which Pokémon is superior, using OpenAI's GPT, Anthropic's Claude, and Google's Gemini models.
 
-![Pokémon AI Debate Screenshot](https://via.placeholder.com/800x450)
+![Pokémon AI Debate Screenshot](./pokemon-ai-debate.gif)
 
 ## Overview
 
@@ -86,7 +86,7 @@ pokemon-ai-debate/
 1. Clone the repository
 
 ```bash
-git clone https://github.com/yourusername/pokemon-ai-debate.git
+git clone https://github.com/tsertic/pokemon-ai-debate.git
 cd pokemon-ai-debate
 ```
 
