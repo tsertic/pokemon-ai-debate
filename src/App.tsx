@@ -15,94 +15,106 @@ const openai = new OpenAI({
   apiKey: import.meta.env.VITE_OPENAI_API_KEY,
   dangerouslyAllowBrowser: true,
 });
-const anthropic = new Anthropic({
-  apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY,
-  dangerouslyAllowBrowser: true,
-});
+interface IDebateMessage {
+  role: "CLAUDE" | "GPT";
+  content: string;
+  round?: number;
+}
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GOOGLE_API_KEY);
 const modelGem = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 function App() {
   const [pokemonA, setPokemonA] = useState(FIRST_GEN_POKEMONS[0]);
   const [pokemonB, setPokemonB] = useState(FIRST_GEN_POKEMONS[3]);
-  const [messages, setMessages] = useState<{ role: string; content: string }[]>(
-    []
-  );
-  const [gptMessages, setGptMessages] = useState<string[]>(["hi"]);
-  const [claudeMessages, setClaudeMessages] = useState<string[]>(["hello"]);
+  const [messages, setMessages] = useState<IDebateMessage[]>([]);
+
   const [winner, setWinner] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [rounds, setRounds] = useState<number>(2);
 
-  const gptSystem = `You are an AI debater who argues that ${pokemonA} is superior.2 sentences max.`;
+  const formatMessagesForGPT = (debateMessages: IDebateMessage[]) => {
+    const gptSystem = `You are an AI debater who argues that ${pokemonA} is superior. 2 sentences max.`;
 
-  const callGPT = async (): Promise<string> => {
-    setIsLoading(true);
-    for (let i = 0; i < gptMessages.length; i++) {
-      setMessages((prevState) => [
-        ...prevState,
-        { role: "assistant", content: gptMessages[i] },
-      ]);
+    const formattedMessages = [{ role: "system", content: gptSystem }];
 
-      if (claudeMessages[i]) {
-        setMessages((prevState) => [
-          ...prevState,
-          { role: "user", content: claudeMessages[i] },
-        ]);
+    debateMessages.forEach((msg) => {
+      if (msg.role === "GPT") {
+        formattedMessages.push({ role: "assistant", content: msg.content });
+      } else if (msg.role === "CLAUDE") {
+        formattedMessages.push({ role: "user", content: msg.content });
       }
-    }
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [{ role: "system", content: gptSystem }],
     });
-    setIsLoading(false);
-    return completion.choices[0]?.message?.content || "";
+
+    return formattedMessages;
   };
 
-  const callClaude = async (chatgptMessages: string[]): Promise<string> => {
+  const callGPT = async (debateMessages: IDebateMessage[]) => {
     try {
-      const allMessages = [
-        ...chatgptMessages
-          .map((msg, i) => [
-            { role: "user", content: msg },
-            { role: "assistant", content: claudeMessages[i] || "" },
-          ])
-          .flat(),
-      ];
+      const formattedMessages = formatMessagesForGPT(debateMessages);
+      console.log("Sending to GPT: ", formattedMessages);
 
-      console.log(allMessages, "All mesages");
-      /* const completion = await anthropic.messages.create({
-        model: "claude-3-haiku-20240307",
-        system: claudeSystem,
-        messages: allMessages as any,
-        max_tokens: 500,
-      }); */
-      const response = await fetch("http://localhost:3001/api/claude", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: allMessages, pokemonB }),
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages:
+          formattedMessages as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
       });
-      if (!response.ok)
-        throw new Error("Neuspješan zahtjev prema proxy serveru.");
-
-      return response.json();
+      return completion.choices[0]?.message?.content || "";
     } catch (error) {
-      console.error("Greška u pozivu Claude API-ja:", error);
+      console.error("Error calling GPT API:", error);
       return "";
     }
   };
 
-  const callGemini = async (
-    gptResponse: string[],
-    claudeResponse: string[]
-  ): Promise<string> => {
-    const chatSession = modelGem.startChat({
-      history: [],
-      generationConfig: {
-        maxOutputTokens: 500,
-      },
-    });
-    const prompt = `
+  const callClaude = async (debateMessages: IDebateMessage[]) => {
+    try {
+      const formattedMessage = debateMessages
+        .map((msg) => {
+          if (msg.role === "GPT") {
+            return { role: "user", content: msg.content };
+          } else if (msg.role === "CLAUDE") {
+            return { role: "assistant", content: msg.content };
+          }
+          return null;
+        })
+        .filter(Boolean); //Remove any null entries
+
+      console.log("sending to Claude", formattedMessage);
+      const response = await fetch("http://localhost:3001/api/claude", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: formattedMessage,
+          pokemonB,
+        }),
+      });
+      if (!response.ok) throw new Error("Failed request to proxy server");
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error calling Claude API: ", error);
+      return "";
+    }
+  };
+
+  const callGemini = async (debateMessages: IDebateMessage[]) => {
+    try {
+      //Extract GPT and Claude messages
+
+      const gptMessages = debateMessages
+        .filter((msg) => msg.role === "GPT")
+        .map((msg) => msg.content);
+
+      const claudeMessages = debateMessages
+        .filter((msg) => msg.role === "CLAUDE")
+        .map((msg) => msg.content);
+
+      const chatSession = modelGem.startChat({
+        history: [],
+        generationConfig: {
+          maxOutputTokens: 500,
+        },
+      });
+      const prompt = `
     You are a fair and impartial judge in a Pokémon debate.
     You listen carefully to the arguments made by two AI debaters.
     After evaluating their logic, reasoning, and evidence, you make a final judgment on which Pokémon is superior.
@@ -110,110 +122,67 @@ function App() {
     Summarize the key points from both sides and declare the winner in a maximum of 3 sentences.
     last sentance should be WINNER: POKEMON WHO WON DEBATE
 
-    GPT-4o-mini's arguments: ${gptResponse.join(" | ")}
-    Claude-3-haiku's arguments: ${claudeResponse.join(" | ")}
+    GPT-4o-mini's arguments for ${pokemonA}: ${gptMessages.join(" | ")}
+    Claude-3-haiku's arguments for ${pokemonB} : ${claudeMessages.join(" | ")}
   `;
 
-    const response = await chatSession.sendMessage(prompt);
-    return response.response.text();
+      const response = await chatSession.sendMessage(prompt);
+      return response.response.text();
+    } catch (error) {
+      console.error("Error calling Gemini API: ", error);
+      return "Error generating verdict.";
+    }
   };
 
-  /*   const startDebate = async () => {
-    setMessages([]);
-    setWinner(null);
-    for (let i = 0; i < rounds; i++) {
-      const gptNext = await callGPT();
-      console.log(`GPT:\n${gptNext}\n`);
-      setGptMessages((prevGptMessages) => [...prevGptMessages, gptNext]);
-      setMessages((prevMessages) => [
-        ...prevMessages,
-        { role: "GPT", content: gptNext },
-      ]);
-      console.log(
-        "PRIJE POZIVA CLAUDA gpt - messages - claude",
-        gptMessages,
-        messages,
-        claudeMessages
-      );
-      const claudeNext = await callClaude();
-      console.log(`Claude:\n${claudeNext}\n`);
-      setClaudeMessages((prevClaudeMessages) => [
-        ...prevClaudeMessages,
-        claudeNext,
-      ]);
-      setMessages((prevMessages) => [
-        ...prevMessages,
-        { role: "CLAUDE", content: claudeNext },
-      ]);
-    }
-    console.log("Final Verdict by GEMINI");
-    const verdict = await callGemini(gptMessages, claudeMessages);
-
-    setWinner(verdict);
-    console.log(messages, "MESSAGES");
-    console.log(verdict, "VERDICT");
-  }; */
-
   const startDebate = async () => {
-    setMessages([]);
-    setClaudeMessages([]);
-    setGptMessages([]);
-    setWinner(null);
+    try {
+      setIsLoading(true);
+      setMessages([]);
+      setWinner(null);
+      const debateMessages: IDebateMessage[] = [];
 
-    let updatedGptMessages: any[] | ((prevState: string[]) => string[]) = [];
-    let updatedClaudeMessages: any[] | ((prevState: string[]) => string[]) = [];
-    let updatedMessages:
-      | any[]
-      | ((
-          prevState: { role: string; content: string }[]
-        ) => { role: string; content: string }[]) = [];
+      for (let i = 0; i < rounds; i++) {
+        //get gpt response with full context
+        const gptResponse = await callGPT(debateMessages);
+        console.log(`Round ${i + 1} GPT:`, gptResponse);
 
-    for (let i = 0; i < rounds; i++) {
-      const gptNext = await callGPT();
-      setTimeout(() => {}, 300);
+        const gptMessage: IDebateMessage = {
+          role: "GPT",
+          content: gptResponse,
+          round: i + 1,
+        };
 
-      console.log(`GPT:\n${gptNext}\n`);
+        debateMessages.push(gptMessage);
+        setMessages([...debateMessages]);
 
-      updatedGptMessages = [...updatedGptMessages, gptNext];
-      updatedMessages = [
-        ...updatedMessages,
-        { role: "GPT", content: gptNext, round: i + 1 },
-      ];
+        //small delay to allow UI to update
+        await new Promise((resolve) => setTimeout(resolve, 300));
 
-      setGptMessages(updatedGptMessages);
-      setMessages(updatedMessages);
+        //claude response with full context
+        const claudeResponse = await callClaude(debateMessages);
+        console.log(`Round ${i + 1} Claude:`, claudeResponse);
 
-      console.log(
-        "PRIJE POZIVA CLAUDA gpt - messages - claude",
-        updatedGptMessages,
-        updatedMessages,
-        updatedClaudeMessages
-      );
+        const claudeMessage: IDebateMessage = {
+          role: "CLAUDE",
+          content: claudeResponse,
+          round: i + 1,
+        };
 
-      setTimeout(() => {}, 300);
-      const claudeNext = await callClaude(updatedGptMessages);
-      setTimeout(() => {}, 300);
-      console.log(`Claude:\n${claudeNext}\n`);
+        debateMessages.push(claudeMessage);
+        setMessages([...debateMessages]);
+        //small delay
+        await new Promise((resolve) => setTimeout(resolve, 300));
 
-      updatedClaudeMessages = [...updatedClaudeMessages, claudeNext];
-      updatedMessages = [
-        ...updatedMessages,
-        { role: "CLAUDE", content: claudeNext, round: i + 1 },
-      ];
-
-      setClaudeMessages(updatedClaudeMessages);
-      setMessages(updatedMessages);
+        //Final Verdict
+        console.log(`Getting final verdict from Gemini...`);
+        const verdict = await callGemini(debateMessages);
+        setWinner(verdict);
+      }
+    } catch (error) {
+      console.error("Error in debate process: ", error);
+    } finally {
+      setIsLoading(false);
     }
-
-    console.log(updatedMessages, "MESSAGES kad se loop zavrsi");
-    console.log("Final Verdict by GEMINI");
-    const verdict = await callGemini(updatedGptMessages, updatedClaudeMessages);
-
-    setWinner(verdict);
-
-    console.log(verdict, "VERDICT");
-    setClaudeMessages([]);
-    setGptMessages([]);
   };
   return (
     <div className="min-h-screen bg-red-600">
