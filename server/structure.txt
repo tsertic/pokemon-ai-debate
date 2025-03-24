@@ -1,0 +1,35 @@
+server/
+│
+├── config/                  # Configuration files
+│   ├── env.js               # Environment variables setup
+│   └── ai-config.js         # AI model configurations
+│
+├── controllers/             # Route handlers
+│   ├── gpt-controller.js    # GPT API route handlers
+│   ├── claude-controller.js # Claude API route handlers
+│   └── gemini-controller.js # Gemini API route handlers
+│
+├── services/                # Business logic
+│   ├── gpt-service.js       # OpenAI API integration
+│   ├── claude-service.js    # Anthropic API integration
+│   └── gemini-service.js    # Google AI integration
+│
+├── utils/                   # Utility functions
+│   ├── message-formatter.js # Format messages for different AI models
+│   ├── error-handler.js     # Error handling utilities
+│   └── logger.js            # Logging utilities
+│
+├── middleware/              # Express middleware
+│   ├── error-middleware.js  # Error handling middleware
+│   └── logger-middleware.js # Request logging middleware
+│
+├── routes/                  # API routes
+│   ├── gpt-routes.js        # GPT API routes
+│   ├── claude-routes.js     # Claude API routes
+│   ├── gemini-routes.js     # Gemini API routes
+│   └── index.js             # Route aggregator
+│
+├── .env                     # Environment variables (gitignored)
+├── package.json             # Project dependencies
+├── server.js                # Entry point
+└── README.md                # Documentation

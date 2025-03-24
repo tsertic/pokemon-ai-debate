@@ -1,7 +1,3 @@
-import OpenAI from "openai";
-import Anthropic from "@anthropic-ai/sdk";
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
 import { useState } from "react";
 
 import "./App.css";
@@ -11,63 +7,63 @@ import { Loader2 } from "lucide-react";
 import { DebateArena } from "./components/debate-arena";
 import { PokemonSelect } from "./components/pokemon-select";
 
-const openai = new OpenAI({
-  apiKey: import.meta.env.VITE_OPENAI_API_KEY,
-  dangerouslyAllowBrowser: true,
-});
+// Server API URL - move to environment variable in production
+const API_URL = "http://localhost:3001/api";
+
 interface IDebateMessage {
   role: "CLAUDE" | "GPT";
   content: string;
   round?: number;
 }
-const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GOOGLE_API_KEY);
-const modelGem = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 function App() {
   const [pokemonA, setPokemonA] = useState(FIRST_GEN_POKEMONS[0]);
   const [pokemonB, setPokemonB] = useState(FIRST_GEN_POKEMONS[3]);
   const [messages, setMessages] = useState<IDebateMessage[]>([]);
-
   const [winner, setWinner] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [rounds, setRounds] = useState<number>(2);
 
-  const formatMessagesForGPT = (debateMessages: IDebateMessage[]) => {
-    const gptSystem = `You are an AI debater who argues that ${pokemonA} is superior. 2 sentences max.`;
-
-    const formattedMessages = [{ role: "system", content: gptSystem }];
-
-    debateMessages.forEach((msg) => {
-      if (msg.role === "GPT") {
-        formattedMessages.push({ role: "assistant", content: msg.content });
-      } else if (msg.role === "CLAUDE") {
-        formattedMessages.push({ role: "user", content: msg.content });
-      }
-    });
-
-    return formattedMessages;
-  };
-
   const callGPT = async (debateMessages: IDebateMessage[]) => {
     try {
-      const formattedMessages = formatMessagesForGPT(debateMessages);
-      console.log("Sending to GPT: ", formattedMessages);
+      // Format messages for GPT API request
+      const formattedMessages = debateMessages
+        .map((msg) => {
+          if (msg.role === "GPT") {
+            return { role: "assistant", content: msg.content };
+          } else if (msg.role === "CLAUDE") {
+            return { role: "user", content: msg.content };
+          }
+          return null;
+        })
+        .filter(Boolean); // Remove any null entries
 
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages:
-          formattedMessages as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
+      console.log("Sending to GPT API:", formattedMessages.length, "messages");
+
+      const response = await fetch(`${API_URL}/gpt`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: formattedMessages,
+          pokemonA,
+        }),
       });
-      return completion.choices[0]?.message?.content || "";
+
+      if (!response.ok) {
+        throw new Error(`Failed request to GPT API: ${response.status}`);
+      }
+
+      return await response.json();
     } catch (error) {
       console.error("Error calling GPT API:", error);
-      return "";
+      return "Error: Could not get response from GPT";
     }
   };
 
   const callClaude = async (debateMessages: IDebateMessage[]) => {
     try {
-      const formattedMessage = debateMessages
+      // Format messages for Claude API request
+      const formattedMessages = debateMessages
         .map((msg) => {
           if (msg.role === "GPT") {
             return { role: "user", content: msg.content };
@@ -76,30 +72,37 @@ function App() {
           }
           return null;
         })
-        .filter(Boolean); //Remove any null entries
+        .filter(Boolean); // Remove any null entries
 
-      console.log("sending to Claude", formattedMessage);
-      const response = await fetch("http://localhost:3001/api/claude", {
+      console.log(
+        "Sending to Claude API:",
+        formattedMessages.length,
+        "messages"
+      );
+
+      const response = await fetch(`${API_URL}/claude`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: formattedMessage,
+          messages: formattedMessages,
           pokemonB,
         }),
       });
-      if (!response.ok) throw new Error("Failed request to proxy server");
+
+      if (!response.ok) {
+        throw new Error(`Failed request to Claude API: ${response.status}`);
+      }
 
       return await response.json();
     } catch (error) {
-      console.error("Error calling Claude API: ", error);
-      return "";
+      console.error("Error calling Claude API:", error);
+      return "Error: Could not get response from Claude";
     }
   };
 
-  const callGemini = async (debateMessages: IDebateMessage[]) => {
+  const getVerdict = async (debateMessages: IDebateMessage[]) => {
     try {
-      //Extract GPT and Claude messages
-
+      // Extract GPT and Claude messages
       const gptMessages = debateMessages
         .filter((msg) => msg.role === "GPT")
         .map((msg) => msg.content);
@@ -108,29 +111,27 @@ function App() {
         .filter((msg) => msg.role === "CLAUDE")
         .map((msg) => msg.content);
 
-      const chatSession = modelGem.startChat({
-        history: [],
-        generationConfig: {
-          maxOutputTokens: 500,
-        },
-      });
-      const prompt = `
-    You are a fair,wise and impartial judge in a Pokémon debate.
-    You listen carefully to the arguments made by two AI debaters.
-    After evaluating their logic, reasoning, and evidence, you make a final judgment on which Pokémon is superior.
-    Your decision must be based on the debate, not personal bias.
-    Summarize the key points from both sides and declare the winner in a maximum of 3 sentences.
-    last sentance should be WINNER: POKEMON WHO WON DEBATE
-      Talk like old wise wizard judge.
-    GPT-4o-mini's arguments for ${pokemonA}: ${gptMessages.join(" | ")}
-    Claude-3-haiku's arguments for ${pokemonB} : ${claudeMessages.join(" | ")}
-  `;
+      console.log("Getting verdict from Gemini");
 
-      const response = await chatSession.sendMessage(prompt);
-      return response.response.text();
+      const response = await fetch(`${API_URL}/gemini`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          gptMessages,
+          claudeMessages,
+          pokemonA,
+          pokemonB,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed request to Gemini API: ${response.status}`);
+      }
+
+      return await response.json();
     } catch (error) {
-      console.error("Error calling Gemini API: ", error);
-      return "Error generating verdict.";
+      console.error("Error getting verdict:", error);
+      return "Error: Could not get a verdict from Gemini";
     }
   };
 
@@ -139,10 +140,11 @@ function App() {
       setIsLoading(true);
       setMessages([]);
       setWinner(null);
+
       const debateMessages: IDebateMessage[] = [];
 
       for (let i = 0; i < rounds; i++) {
-        //get gpt response with full context
+        // Get GPT response with full context
         const gptResponse = await callGPT(debateMessages);
         console.log(`Round ${i + 1} GPT:`, gptResponse);
 
@@ -153,12 +155,12 @@ function App() {
         };
 
         debateMessages.push(gptMessage);
-        setMessages([...debateMessages]);
+        setMessages([...debateMessages]); // Update UI with current messages
 
-        //small delay to allow UI to update
+        // Add a small delay to allow UI to update
         await new Promise((resolve) => setTimeout(resolve, 300));
 
-        //claude response with full context
+        // Get Claude response with full context
         const claudeResponse = await callClaude(debateMessages);
         console.log(`Round ${i + 1} Claude:`, claudeResponse);
 
@@ -169,21 +171,23 @@ function App() {
         };
 
         debateMessages.push(claudeMessage);
-        setMessages([...debateMessages]);
-        //small delay
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        setMessages([...debateMessages]); // Update UI with current messages
 
-        //Final Verdict
-        console.log(`Getting final verdict from Gemini...`);
-        const verdict = await callGemini(debateMessages);
-        setWinner(verdict);
+        // Add a small delay to allow UI to update
+        await new Promise((resolve) => setTimeout(resolve, 300));
       }
+
+      // Get final verdict
+      console.log("Getting final verdict from Gemini...");
+      const verdict = await getVerdict(debateMessages);
+      setWinner(verdict);
     } catch (error) {
-      console.error("Error in debate process: ", error);
+      console.error("Error in debate process:", error);
     } finally {
       setIsLoading(false);
     }
   };
+
   return (
     <div className="min-h-screen bg-red-600">
       {/* Header */}

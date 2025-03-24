@@ -1,54 +1,197 @@
-# React + TypeScript + Vite
+# Pokémon AI Debate
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+An interactive web application that pits AI against AI in debates about which Pokémon is superior, using OpenAI's GPT, Anthropic's Claude, and Google's Gemini models.
 
-Currently, two official plugins are available:
+![Pokémon AI Debate Screenshot](https://via.placeholder.com/800x450)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Overview
 
-## Expanding the ESLint configuration
+Pokémon AI Debate creates entertaining and educational AI-powered debates where:
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- GPT argues for one Pokémon
+- Claude argues for a different Pokémon
+- Gemini acts as an impartial judge to determine the winner
 
-```js
-export default tseslint.config({
-  extends: [
-    // Remove ...tseslint.configs.recommended and replace with this
-    ...tseslint.configs.recommendedTypeChecked,
-    // Alternatively, use this for stricter rules
-    ...tseslint.configs.strictTypeChecked,
-    // Optionally, add this for stylistic rules
-    ...tseslint.configs.stylisticTypeChecked,
-  ],
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
+Users can select any of the original 151 Pokémon to debate against each other and watch as the AIs construct arguments and counter-arguments across multiple rounds.
+
+## Features
+
+- **Pokémon Selection**: Choose any of the original 151 Pokémon
+- **Real-time Debate**: Watch as AI models debate in real-time
+- **Multi-round Format**: Configure debates for 1-3 rounds
+- **AI Judge**: Get a final verdict from an "impartial" AI judge
+- **Dynamic Visualization**: See Pokémon images and animated battle effects
+- **Responsive Design**: Works on desktop and mobile devices
+
+## Technology Stack
+
+### Frontend
+
+- React with TypeScript
+- Tailwind CSS for styling
+- shadcn/ui component library
+- React Query for API requests
+
+### Backend
+
+- Node.js with Express
+- AI service integrations:
+  - OpenAI API (GPT)
+  - Anthropic API (Claude)
+  - Google AI API (Gemini)
+- Winston for logging
+
+### APIs
+
+- PokéAPI for Pokémon data and images
+
+## Project Structure
+
+```
+pokemon-ai-debate/
+│
+├── client/                  # Frontend React application
+│   ├── public/              # Static files
+│   ├── src/                 # React source code
+│   │   ├── components/      # UI components
+│   │   ├── constants/       # Constants like Pokémon list
+│   │   └── App.tsx          # Main application
+│   └── package.json         # Frontend dependencies
+│
+├── server/                  # Backend Express server
+│   ├── config/              # Configuration files
+│   ├── controllers/         # Route handlers
+│   ├── services/            # Business logic
+│   ├── utils/               # Utility functions
+│   ├── middleware/          # Express middleware
+│   ├── routes/              # API routes
+│   ├── logs/                # Log files (created at runtime)
+│   ├── .env                 # Environment variables (not in git)
+│   └── server.js            # Entry point
+│
+├── package.json             # Project dependencies
+└── README.md                # This file
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Installation
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### Prerequisites
 
-export default tseslint.config({
-  plugins: {
-    // Add the react-x and react-dom plugins
-    'react-x': reactX,
-    'react-dom': reactDom,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended typescript rules
-    ...reactX.configs['recommended-typescript'].rules,
-    ...reactDom.configs.recommended.rules,
-  },
-})
+- Node.js (v16 or higher)
+- npm or yarn
+- API keys for OpenAI, Anthropic, and Google AI
+
+### Setup
+
+1. Clone the repository
+
+```bash
+git clone https://github.com/yourusername/pokemon-ai-debate.git
+cd pokemon-ai-debate
 ```
+
+2. Install backend dependencies
+
+```bash
+cd server
+npm install
+```
+
+3. Create `.env` file in the server directory with your API keys
+
+```
+PORT=3001
+NODE_ENV=development
+OPENAI_API_KEY=your_openai_key_here
+ANTHROPIC_API_KEY=your_anthropic_key_here
+GOOGLE_API_KEY=your_google_key_here
+```
+
+4. Install frontend dependencies
+
+```bash
+cd ../client
+npm install
+```
+
+5. Create `.env` file in the client directory (for development)
+
+```
+VITE_API_URL=http://localhost:3001/api
+```
+
+## Running the Application
+
+### Development Mode
+
+Start the backend server:
+
+```bash
+cd server
+npm run dev
+```
+
+In a separate terminal, start the frontend:
+
+```bash
+cd client
+npm run dev
+```
+
+The application will be available at http://localhost:5173 (or another port if 5173 is in use).
+
+### Production Mode
+
+Build the frontend:
+
+```bash
+cd client
+npm run build
+```
+
+Start the backend server in production mode:
+
+```bash
+cd ../server
+npm start
+```
+
+## Usage
+
+1. Select a Pokémon for GPT to defend
+2. Select a different Pokémon for Claude to defend
+3. Choose the number of debate rounds (1-3)
+4. Click "Start Pokémon Debate!"
+5. Watch as the AI models debate
+6. At the end, view Gemini's verdict and the winner
+
+## Customization
+
+### Adding More Pokémon
+
+Edit the `POKE_LIST.ts` file in the client's constants directory to include more Pokémon.
+
+### Changing AI Prompts
+
+Modify the prompt templates in the server's `ai-config.js` file to change how the AIs approach the debates.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the project
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+MIT
+
+## Acknowledgments
+
+- Pokémon is a trademark of Nintendo/Game Freak
+- Special thanks to the creators of the PokéAPI
+- Inspired by the fun debates Pokémon fans have had for decades
+- Built with AI models from OpenAI, Anthropic, and Google
