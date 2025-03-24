@@ -118,3 +118,37 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Add these animations to your CSS file */
+@keyframes pulse-slow {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 2s infinite;
+}
+
+/* Confetti animation */
+@keyframes confetti-rain {
+  0% {
+    transform: translateY(-100vh);
+  }
+  100% {
+    transform: translateY(100vh);
+  }
+}
+
+.confetti {
+  position: fixed;
+  width: 10px;
+  height: 10px;
+  background-color: var(--color);
+  opacity: 0.7;
+  animation: confetti-rain linear;
+}

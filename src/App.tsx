@@ -115,13 +115,13 @@ function App() {
         },
       });
       const prompt = `
-    You are a fair and impartial judge in a Pokémon debate.
+    You are a fair,wise and impartial judge in a Pokémon debate.
     You listen carefully to the arguments made by two AI debaters.
     After evaluating their logic, reasoning, and evidence, you make a final judgment on which Pokémon is superior.
     Your decision must be based on the debate, not personal bias.
     Summarize the key points from both sides and declare the winner in a maximum of 3 sentences.
     last sentance should be WINNER: POKEMON WHO WON DEBATE
-
+      Talk like old wise wizard judge.
     GPT-4o-mini's arguments for ${pokemonA}: ${gptMessages.join(" | ")}
     Claude-3-haiku's arguments for ${pokemonB} : ${claudeMessages.join(" | ")}
   `;

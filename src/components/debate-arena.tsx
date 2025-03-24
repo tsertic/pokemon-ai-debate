@@ -1,5 +1,6 @@
 import { Card } from "@/components/ui/card";
-import { Loader2 } from "lucide-react";
+import { Loader2, Trophy } from "lucide-react";
+import { useEffect, useState } from "react";
 
 interface DebateArenaProps {
   pokemonA: string;
@@ -16,15 +17,73 @@ export function DebateArena({
   winner,
   isLoading,
 }: DebateArenaProps) {
+  const [winnerPokemon, setWinnerPokemon] = useState<string | null>(null);
+  const [winnerImage, setWinnerImage] = useState<string | null>(null);
+  const [showWinnerEffect, setShowWinnerEffect] = useState(false);
+
+  // Parse winner text to determine which Pokémon won
+  useEffect(() => {
+    if (winner) {
+      // Look for the winning Pokémon in the winner text
+      const winnerText = winner.toUpperCase();
+
+      // First check for explicit "WINNER: X" format
+      const winnerMatch = winnerText.match(/WINNER:\s*(\w+)/i);
+      if (winnerMatch && winnerMatch[1]) {
+        const pokemonName = winnerMatch[1];
+        setWinnerPokemon(pokemonName);
+      } else if (winnerText.includes(pokemonA.toUpperCase())) {
+        setWinnerPokemon(pokemonA);
+      } else if (winnerText.includes(pokemonB.toUpperCase())) {
+        setWinnerPokemon(pokemonB);
+      }
+
+      // We removed the automatic reveal - now it only happens on click
+    }
+  }, [winner, pokemonA, pokemonB]);
+
+  // Fetch winner Pokémon image
+  useEffect(() => {
+    const fetchPokemonImage = async () => {
+      if (!winnerPokemon) return;
+
+      try {
+        const formattedName = winnerPokemon.toLowerCase();
+        const response = await fetch(
+          `https://pokeapi.co/api/v2/pokemon/${formattedName}`
+        );
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch ${winnerPokemon}`);
+        }
+
+        const data = await response.json();
+        const officialArtwork =
+          data.sprites.other["official-artwork"].front_default;
+        const sprite = officialArtwork || data.sprites.front_default;
+
+        if (sprite) {
+          setWinnerImage(sprite);
+        }
+      } catch (error) {
+        console.error(`Error fetching ${winnerPokemon} image:`, error);
+      }
+    };
+
+    if (winnerPokemon) {
+      fetchPokemonImage();
+    }
+  }, [winnerPokemon]);
+
   const getAIAvatar = (ai: string) => {
-    if (ai === "GPT") return "/placeholder.svg?height=64&width=64";
-    if (ai === "Claude") return "/placeholder.svg?height=64&width=64";
+    if (ai === "GPT") return "/images/bot-two.png";
+    if (ai === "CLAUDE") return "/images/bot-one.png";
     return "/placeholder.svg?height=64&width=64";
   };
 
   const getAIColor = (ai: string) => {
     if (ai === "GPT") return "bg-green-100 border-green-500";
-    if (ai === "Claude") return "bg-purple-100 border-purple-500";
+    if (ai === "CLAUDE") return "bg-purple-100 border-purple-500";
     return "bg-gray-100";
   };
 
@@ -53,7 +112,7 @@ export function DebateArena({
             </div>
             <div className="bg-white rounded-full p-1 border-4 border-blue-500">
               <img
-                src={getAIAvatar("Claude") || "/placeholder.svg"}
+                src={getAIAvatar("CLAUDE") || "/placeholder.svg"}
                 alt="Claude"
                 width={64}
                 height={64}
@@ -116,12 +175,65 @@ export function DebateArena({
                 </div>
               )}
 
-              {winner && (
-                <div className="mt-6 p-4 bg-yellow-100 border-2 border-yellow-500 rounded-xl">
+              {winner && !showWinnerEffect && (
+                <div
+                  className="mt-6 p-4 bg-yellow-100 border-2 border-yellow-500 rounded-xl relative cursor-pointer transition-all hover:bg-yellow-200 hover:shadow-lg"
+                  onClick={() => setShowWinnerEffect(true)}
+                >
                   <div className="font-bold text-center mb-2 text-xl">
-                    Gemini's Final Decision:
+                    Judge Gemini's Final Decision
                   </div>
-                  <div className="text-center">{winner}</div>
+                  <div className="text-center font-bold text-lg">
+                    Click to reveal winner!
+                  </div>
+                  <div className="flex justify-center mt-2">
+                    <div className="animate-bounce">
+                      <Trophy className="h-6 w-6 text-yellow-600" />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Winner Animation Overlay */}
+              {showWinnerEffect && winnerImage && (
+                <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-10">
+                  <div className="relative bg-gray-800 p-8 rounded-xl max-w-2xl w-full mx-auto">
+                    <div className="animate-bounce absolute -top-16 left-1/2 transform -translate-x-1/2">
+                      <Trophy className="h-12 w-12 text-yellow-400" />
+                    </div>
+
+                    <div className="flex flex-col md:flex-row items-center gap-6">
+                      <div className="relative flex-shrink-0">
+                        <div className="absolute -inset-2 bg-gradient-to-r from-yellow-400 via-yellow-300 to-yellow-400 rounded-full animate-pulse opacity-70" />
+                        <img
+                          src={winnerImage}
+                          alt={winnerPokemon || "Winner"}
+                          className="h-40 w-40 object-contain relative z-10 animate-pulse-slow bg-gray-700 rounded-full p-2"
+                        />
+                      </div>
+
+                      <div className="text-center md:text-left flex-grow">
+                        <h2 className="text-3xl font-bold text-white mb-2">
+                          {winnerPokemon}
+                        </h2>
+                        <div className="text-xl text-yellow-300 font-bold mb-3">
+                          is the WINNER!
+                        </div>
+                        <div className="text-white text-base max-h-28 overflow-y-auto">
+                          {winner}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-center mt-6">
+                      <button
+                        onClick={() => setShowWinnerEffect(false)}
+                        className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
